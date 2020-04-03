@@ -2,6 +2,8 @@
 //modulos
 var bcrypt = require('bcrypt-nodejs');
 var jwt = require('../services/jwt');
+var fs = require('fs');
+var path = require('path');
 //modelos
 var userModel = require('../models/user');
 
@@ -75,17 +77,12 @@ function login(req, res) {
             if (user) {
                 bcrypt.compare(password, user.password, (err, check) => {
                     if (check) {
-                        if (params.gettoken) {
-                            //devolver token jwt
-                            res.status(200).send({
-                                toekn: jwt.createToken(user)
-                            });
-
-                        } else {
-                            res.status(200).send({user});
-                        }
+                        //devolver token jwt
+                        res.status(200).send({
+                            token: jwt.createToken(user)
+                        });
                     } else {
-                        res.status(404).send({message: 'El usuario no se ha podido loguearse correctamente'});
+                        res.status(401).send({message: 'El usuario no se ha podido loguearse correctamente'});
                     }
 
                 });
@@ -101,7 +98,7 @@ function login(req, res) {
 function updateUser(req, res) {
     var userId = req.params.id;
     var update = req.body;
-    if (userId != req.user.sub) {
+    if (userId !== req.user.sub) {
         return res.status(403).send({
             message: 'No tienes permiso'
         });
@@ -125,9 +122,106 @@ function updateUser(req, res) {
 
 }
 
+function uploadImage(req, res) {
+    var userId = req.params.id;
+    var file_name = 'No subido...';
+    if (req.files) {
+        var file_path = req.files.file.path;
+        var file_split = file_path.split('/');
+        file_name = file_split[2];
+        var ext_split = file_name.split('.');
+        var file_ext = ext_split[1];
+        if (userId !== req.user.sub) {
+            return res.status(403).send({
+                message: 'No tienes permiso'
+            });
+        }
+        if (file_ext == 'png' || file_ext == 'jpg' || file_ext == 'jpeg' || file_ext == 'gif') {
+
+            userModel.findByIdAndUpdate(userId, {image: file_name}, {new: true}, (err, userUpdated) => {
+                if (err) {
+                    return res.status(500).send({
+                        message: 'Error al actualizar usuario' + err
+                    });
+                } else {
+                    if (!userUpdated) {
+                        return res.status(404).send({
+                            message: 'NO se ha podido actualizar el usuario'
+                        });
+                    } else {
+                        return res.status(200).send({userUpdated, image: file_name});
+                    }
+                }
+            });
+        } else {
+            fs.unlink(file_path, (err) => {
+                if (err) {
+                    res.status(404).send({
+                        message: 'extensión no válida y fichero no borrado'
+                    });
+                } else {
+                    res.status(404).send({
+                        message: 'extensión no válida'
+                    });
+                }
+
+            });
+
+        }
+
+    } else {
+        res.status(404).send({
+            message: 'No se han subido los archivos'
+        });
+    }
+}
+
+function getImageFile(req, res) {
+    var imageFile = req.params.imageFile;
+    var path_file = './uploads/users/' + imageFile;
+
+    fs.exists(path_file, function (exists) {
+        if (exists) {
+            res.sendFile(path.resolve(path_file));
+        } else {
+            res.status(404).send({
+                message: 'la imagen no existe'
+            });
+        }
+
+    });
+
+}
+
+function getKeepers(req, res) {
+    userModel.find({role: "ROLE_ADMIN"}).exec((err, users) => {
+        if (err) {
+            res.status(500).send({
+                message: 'error en la petición'
+            });
+        } else {
+            if (!users) {
+                res.status(404).send({
+                    message: 'No hay cuidadores'
+                });
+
+            } else {
+                res.status(200).send({users});
+            }
+
+        }
+
+
+    });
+
+}
+
 module.exports = {
     pruebas,
     saveUser,
     login,
-    updateUser
+    updateUser,
+    uploadImage,
+    getImageFile,
+    getKeepers
 };

@@ -2,7 +2,7 @@
 var jwt = require('jwt-simple');
 var moment = require('moment');
 let secret = 'calve_secreta_del_curso_de angular';
-var payload
+var payload;
 exports.ensureAuth = function (req, res, next) {
     if (!req.headers.authorization) {
         return res.status(403).send({message: 'La petición no tiene la cabecera de autenticación'});
